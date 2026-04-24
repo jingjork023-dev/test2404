@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Medical Quiz - Auto Correct & Redo</title>
+    <style>
+        :root {
+            --primary: #1a365d;
+            --secondary: #2d3748;
+            --khmer: #0d9488;
+            --correct: #22c55e;
+            --wrong: #ef4444;
+            --redo: #3b82f6;
+            --bg: #f8fafc;
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg); color: #1e293b; margin: 0; padding: 20px; line-height: 1.5; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        .header { background: var(--primary); color: white; padding: 30px; border-radius: 16px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        .nav-bar { position: sticky; top: 10px; z-index: 1000; display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-khmer { background: var(--khmer); color: white; }
+        .btn-reset { background: #64748b; color: white; }
+
+        .question-card { background: white; padding: 30px; border-radius: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0; position: relative; transition: 0.3s; }
+        .question-card.locked { pointer-events: none; opacity: 0.9; } /* Prevent interaction after check */
+        
+        .eng-q { font-size: 1.15em; font-weight: 700; color: var(--primary); display: block; }
+        .khm-q { font-size: 1.05em; color: var(--khmer); display: block; margin: 10px 0 20px 0; border-left: 4px solid var(--khmer); padding-left: 15px; }
+        
+        .hidden-khmer { display: none !important; }
+
+        .option-label { 
+            display: flex; align-items: flex-start; padding: 16px; border: 2px solid #f1f5f9; 
+            border-radius: 12px; cursor: pointer; margin-bottom: 10px; transition: 0.2s; background: #fdfdfd;
+        }
+        .option-label:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .option-label input { margin-top: 5px; margin-right: 15px; transform: scale(1.3); }
+
+        /* Correction Coloring */
+        .user-correct { background-color: #f0fdf4 !important; border-color: var(--correct) !important; color: #166534 !important; font-weight: bold; }
+        .user-wrong { background-color: #fef2f2 !important; border-color: var(--wrong) !important; color: #991b1b !important; }
+        .actual-answer { border: 2px dashed var(--correct) !important; background-color: #f0fdf4; }
+
+        .feedback-box { padding: 15px; border-radius: 10px; margin-top: 15px; font-weight: bold; text-align: center; display: none; border: 1px solid transparent; }
+        .reveal-ans { color: var(--correct); font-size: 0.95em; margin-top: 5px; display: block; }
+
+        .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9; }
+        .count-tag { font-size: 0.8em; color: #64748b; font-weight: bold; text-transform: uppercase; }
+        
+        .action-btns { display: flex; gap: 10px; }
+        .btn-redo { 
+            background: var(--redo); color: white; padding: 6px 15px; border: none; border-radius: 6px; 
+            font-size: 0.85em; font-weight: bold; cursor: pointer; display: none; pointer-events: auto !important;
+        }
+        .btn-redo:hover { background: #2563eb; }
+
+        .pdf-link { color: #ef4444; text-decoration: none; font-weight: bold; font-size: 0.85em; border: 1px solid #ef4444; padding: 6px 12px; border-radius: 6px; }
+        .pdf-link:hover { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Medical Quiz: Trauma & Oncology</h1>
+        <p>Auto-Correction Logic with Individual Redo Buttons</p>
+    </div>
+
+    <div class="nav-bar">
+        <button class="btn btn-khmer" onclick="toggleKhmer()">Show/Hide Khmer (បង្ហាញ/លាក់ ខ្មែរ)</button>
+        <button class="btn btn-reset" onclick="window.location.reload()">Reset All Questions</button>
+    </div>
+
+    <div id="quiz-anchor"></div>
+</div>
+
+<script>
+const quizData = [
+    { id: 1, eng: "1.Causes of chest injury for blunt trauma: (Choose the correct answers)", khm: "១. មូលហេតុនៃរបួសទ្រូងដោយសារការទង្គិច៖ (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Falls",k:"ការធ្លាក់ពីលើទីខ្ពស់"},{v:"B",e:"Stab wounds",k:"របួសដោយសារការចាក់"},{v:"C",e:"Blast injuries",k:"របួសដោយសារការផ្ទុះ"},{v:"D",e:"Gunshot wounds",k:"របួសដោយគ្រាប់កាំភ្លើង"},{v:"E",e:"Motor vehicle accidents",k:"គ្រោះថ្នាក់ចរាចរណ៍"}], ans: ["A","C","E"], pg: 6 },
+    { id: 2, eng: "2.Causes of chest injury for penetrating trauma: (Choose the correct answers)", khm: "២. មូលហេតុនៃរបួសទ្រូងដោយសារការចាក់ទម្លុះ៖ (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Falls",k:"ការធ្លាក់ពីលើទីខ្ពស់"},{v:"B",e:"Stab wounds",k:"របួសដោយសារការចាក់"},{v:"C",e:"Blast injuries",k:"របួសដោយសារការផ្ទុះ"},{v:"D",e:"Gunshot wounds",k:"របួសដោយគ្រាប់កាំភ្លើង"},{v:"E",e:"Shrapnel wounds",k:"របួសដោយអំបែងគ្រាប់"}], ans: ["B","D","E"], pg: 6 },
+    { id: 3, eng: "3.How many percentages of isolated liver injury that occurs in patients?", khm: "៣. តើរបួសថ្លើមតែមួយមុខ (isolated liver injury) កើតឡើងប៉ុន្មានភាគរយចំពោះអ្នកជំងឺ?", opts: [{v:"A",e:"33%",k:"៣៣%"},{v:"B",e:"45%",k:"៤៥%"},{v:"C",e:"50%",k:"៥០%"},{v:"D",e:"60%",k:"៦០%"}], ans: ["C"], pg: 43 },
+    { id: 4, eng: "4.What are the Traumatic/Tension Pneumothorax? (Choose the correct answers)", khm: "៤. តើអ្វីទៅជាប្រភពនៃជំងឺធ្លាយខ្យល់ក្នុងស្រោមសួតដោយសាររបួស/សម្ពាធ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Primary spontaneous pneumothorax",k:"ការធ្លាយខ្យល់ក្នុងស្រោមសួតដោយឯកឯង"},{v:"B",e:"Pulmonary source",k:"ប្រភពចេញពីសួត"},{v:"C",e:"Tracheobronchial source",k:"ប្រភពចេញពីបំពង់ខ្យល់ ឬទងសួត"},{v:"D",e:"Primary spontaneous pneumothorax (repeat)",k:"ការធ្លាយខ្យល់ក្នុងស្រោមសួតដោយឯកឯង (ស្ទួន)"},{v:"E",e:"Esophageal source",k:"ប្រភពចេញពីបំពង់អាហារ"}], ans: ["B","C","E"], pg: 146 },
+    { id: 5, eng: "5.What are the factors that compromise the exam of Abdominal Injury? (Choose the correct answers)", khm: "៥. តើកត្តាអ្វីខ្លះដែលធ្វើឱ្យមានការរំខានដល់ការពិនិត្យរបួសពោះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Alcohol and other drugs",k:"គ្រឿងស្រវឹង និងគ្រឿងញៀនផ្សេងៗ"},{v:"B",e:"Scratch",k:"ការរលាត់ស្បែក"},{v:"C",e:"Injury to legs",k:"របួសជើង"},{v:"D",e:"Injury to the brain, spinal cord",k:"របួសខួរក្បាល និងខួរឆ្អឹងខ្នង"},{v:"E",e:"Injury to ribs, spine, pelvis",k:"របួសឆ្អឹងជំនី ខ្នង និងអាងត្រគាក"}], ans: ["A","D","E"], pg: 97 },
+    { id: 6, eng: "6.What are the investigation methods for Abdominal Trauma in haemodynamically stable patient? (Choose the correct answers)", khm: "៦. តើវិធីសាស្ត្រពិនិត្យរបួសពោះចំពោះអ្នកជំងឺដែលមានស្ថានភាពចរន្តឈាមនឹងនរមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Full blood count and haematocrit",k:"ការពិនិត្យគ្រាប់ឈាមសរុប"},{v:"B",e:"MCHC",k:"MCHC"},{v:"C",e:"Enzymology",k:"ការពិនិត្យអង់ស៊ីម"},{v:"D",e:"Urea and Electrolytes",k:"ការពិនិត្យអ៊ុយរ៉េ និងជាតិអេឡិចត្រូលីត"},{v:"E",e:"Focused Abdominal Sonography for Trauma",k:"FAST"}], ans: ["A","D","E"], pg: 102 },
+    { id: 7, eng: "7.What are the disadvantages of Focused Abdominal Sonography for Trauma? (Choose the correct answers)", khm: "៧. តើគុណវិបត្តិនៃការពិនិត្យអេកូពោះសម្រាប់ករណីរបួស (FAST) មានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Operator dependent",k:"អាស្រ័យលើសមត្ថភាពរបស់អ្នកពិនិត្យ"},{v:"B",e:"Retroperitoneal structures are not visualized",k:"មិនអាចមើលឃើញផ្នែកនៅក្រោយស្រោមពោះ"},{v:"C",e:"Cannot assess hollow visceral perforation",k:"មិនអាចវាយតម្លៃការធ្លាយសរីរាង្គប្រហោងបាន"},{v:"D",e:"Non-invasive",k:"មិនមានការប៉ះពាល់ដល់រាងកាយ"},{v:"E",e:"No risk from contrast media or radiation",k:"មិនមានហានិភ័យវិទ្យុសកម្ម"}], ans: ["A","B","C"], pg: 103 },
+    { id: 8, eng: "8.What are the advantages of Focused Abdominal Sonography for Trauma? (Choose the correct answers)", khm: "៨. តើគុណសម្បត្តិនៃការពិនិត្យអេកូពោះសម្រាប់ករណីរបួស (FAST) មានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Operator dependent",k:"អាស្រ័យលើសមត្ថភាព"},{v:"B",e:"Retroperitoneal structures are not visualized",k:"មិនអាចមើលឃើញផ្នែកក្រោយ"},{v:"C",e:"Cannot assess hollow visceral perforation",k:"មិនអាចវាយតម្លៃការធ្លាយ"},{v:"D",e:"Non-invasive",k:"មិនមានការប៉ះពាល់ដល់រាងកាយ"},{v:"E",e:"No risk from contrast media or radiation",k:"មិនមានហានិភ័យ"}], ans: ["D","E"], pg: 103 },
+    { id: 9, eng: "9.What are the four view techniques of Focused Abdominal Sonography for Trauma? (Choose the correct answers)", khm: "៩. តើបច្ចេកទេសមើលបួនចំណុចនៃការពិនិត្យអេកូពោះសម្រាប់ករណីរបួស (FAST) មានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Morrison’s pouch",k:"ចន្លោះ Morrison"},{v:"B",e:"Douglas pouch",k:"ចន្លោះ Douglas"},{v:"C",e:"Epigastric",k:"តំបន់ចុងដង្ហើម"},{v:"D",e:"Right upper quadrant",k:"តំបន់ពោះខាងលើផ្នែកស្តាំ"},{v:"E",e:"Left upper quadrant",k:"តំបន់ពោះខាងលើផ្នែកឆ្វេង"}], ans: ["A","B","C","E"], pg: 104 },
+    { id: 10, eng: "10.Sometimes the herniated loop of intestine becomes partially obstructed, producing variable symptoms that may include: (Choose the correct answers)", khm: "១០. ជួនកាលកូនពោះដែលលៀនចេញមកក្រៅ ត្រូវបានស្ទះមួយផ្នែក ដែលបង្កឱ្យមានរោគសញ្ញាដូចជា៖ (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Tenderness",k:"ការឈឺចាប់ពេលប៉ះឬសង្កត់"},{v:"B",e:"Abdominal distension",k:"ការហើមពោះ ឬតឹងពោះ"},{v:"C",e:"Anorexia",k:"ការបាត់បង់ចំណង់អាហារ"},{v:"D",e:"Irritability",k:"ការមួរម៉ៅ ឬរសាប់រសល់"},{v:"E",e:"Strangulation and gangrene",k:"ការស្ទះឈាមជម្រុញឱ្យស្អុយ"}], ans: ["A","B","C","D"], pg: 201 },
+    { id: 11, eng: "11.Squamous cell carcinoma are: (Choose the correct answers)", khm: "១១. (Squamous cell carcinoma) គឺជា៖ (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"More common in males",k:"កើតមានញឹកញាប់ចំពោះបុរស"},{v:"B",e:"Most occur centrally in the large bronchi",k:"ភាគច្រើនកើតនៅផ្នែកកណ្តាលទងសួត"},{v:"C",e:"Can occur in non-smokers",k:"អាចកើតមានចំពោះអ្នកមិនជក់បារី"},{v:"D",e:"Associated with smoking",k:"ពាក់ព័ន្ធនឹងការជក់បារី"},{v:"E",e:"Early metastasis occurs to the kidney, liver organs",k:"ការរាលដាលដំណាក់កាលដំបូង"}], ans: ["A","B","D"], pg: 244 },
+    { id: 12, eng: "12.There are two types of signs and symptoms of lung cancer, what are they? (Choose the correct answers)", khm: "១២. រោគសញ្ញានៃមហារីកសួតមាន ២ ប្រភេទ តើអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Localized – involving the lung",k:"រោគសញ្ញាតាមកន្លែង – ពាក់ព័ន្ធនឹងសួត"},{v:"B",e:"Localized – involved other areas",k:"រោគសញ្ញាតាមកន្លែង – ផ្នែកផ្សេង"},{v:"C",e:"Generalized – involving the lung",k:"រោគសញ្ញាទូទៅ – សួត"},{v:"D",e:"Generalized – involves other areas spread",k:"រោគសញ្ញាទូទៅ – រាលដាលដល់ផ្នែកផ្សេងៗ"}], ans: ["A","D"], pg: 250 },
+    { id: 13, eng: "13.What are the late signs and symptoms of Lung Cancer? (Choose the correct answers)", khm: "១៣. តើរោគសញ្ញាដំណាក់កាលចុងក្រោយនៃមហារីកសួតមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Head and neck edema",k:"ការហើមនៅក្បាល និងក"},{v:"B",e:"Chest/shoulder pain",k:"ការឈឺទ្រូង ឬស្មា"},{v:"C",e:"Hemoptysis",k:"ការក្អកមានឈាម"},{v:"D",e:"Dysphagia",k:"ការពិបាកលេបអាហារ"},{v:"E",e:"Dyspnea",k:"ការពិបាកដកដង្ហើម"}], ans: ["A","D"], pg: 253 },
+    { id: 14, eng: "14.Which ones are not signs and symptoms of the Esophageal Cancer? (Choose the correct answers)", khm: "១៤. តើរោគសញ្ញាមួយណាមិនមែនជារោគសញ្ញានៃមហារីកបំពង់អាហារ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Dysphagia",k:"ការពិបាកលេប"},{v:"B",e:"Always feel dizzy",k:"មានអារម្មណ៍វិលមុខជានិច្ច"},{v:"C",e:"Weight loss without trying",k:"ការស្រកទម្ងន់"},{v:"D",e:"Can’t sleep at night",k:"ដេកមិនលក់"},{v:"E",e:"Chest pain, pressure or burning",k:"ការឈឺទ្រូង"}], ans: ["B","D"], pg: 300 },
+    { id: 15, eng: "15.What are the signs and symptoms of sucking chest wound? (Choose the correct answers)", khm: "១៥. តើរោគសញ្ញានៃរបួសទ្រូងដែលបឺតខ្យល់ចូល (Sucking chest wound) មានអ្វីខ្លះ?", opts: [{v:"A",e:"Difficulty breathing",k:"ការពិបាកដកដង្ហើម"},{v:"B",e:"Normal breathing",k:"ការដកដង្ហើមធម្មតា"},{v:"C",e:"Blunt chest trauma",k:"របួសទ្រូងទង្គិច"},{v:"D",e:"Impaled object in chest",k:"មានវត្ថុមុតស្រួចដោតជាប់"},{v:"E",e:"Pain in chest or shoulder",k:"ការឈឺចាប់ក្នុងទ្រូង ឬស្មា"}], ans: ["A","D","E"], pg: 22 },
+    { id: 16, eng: "16.What are the managements of sucking chest wound? (Choose the correct answers)", khm: "១៦. តើត្រូវគ្រប់គ្រងរបួសទ្រូងដែលបឺតខ្យល់ចូលយ៉ាងដូចម្តេច? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Cover wound and tape 3 sides",k:"គ្របជិត និងបិទស្កុត ៣ ជ្រុង"},{v:"B",e:"Medical treatment",k:"ការព្យាបាលដោយប្រើថ្នាំ"},{v:"C",e:"Cover wound completely without chest tube",k:"គ្របដណ្តប់មុខរបួស"},{v:"D",e:"Seal the wound with airtight material",k:"បិទជិតមុខរបួសជាមួយសម្ភារៈការពារខ្យល់"},{v:"E",e:"May use Asherman chest seal",k:"អាចប្រើបន្ទះបិទទ្រូង Asherman"}], ans: ["A","D","E"], pg: 23 },
+    { id: 17, eng: "17.What are the signs and symptoms of spleen injury? (Choose the correct answers)", khm: "១៧. តើរោគសញ្ញានៃរបួសអណ្តើកមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Blood pressure high",k:"សម្ពាធឈាមឡើងខ្ពស់"},{v:"B",e:"Blood pressure low",k:"សម្ពាធឈាមចុះទាប"},{v:"C",e:"KEHR’s sign-pain in the left shoulder",k:"សញ្ញា Kehr (ឈឺស្មាខាងឆ្វេង)"},{v:"D",e:"Difficult to breath",k:"ការពិបាកដកដង្ហើម"},{v:"E",e:"Pale skin",k:"ស្បែកស្លេកស្លាំង"}], ans: ["B","C","E"], pg: 286 },
+    { id: 18, eng: "18.What are the generalized signs and symptoms of lung cancer? (Choose the correct answers)", khm: "១៨. តើរោគសញ្ញាទូទៅនៃមហារីកសួតមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Change in phlegm",k:"ការផ្លាស់ប្តូរស្លេស្ម"},{v:"B",e:"Abdominal pain, elevated liver tests",k:"ឈឺពោះ, មុខងារថ្លើម"},{v:"C",e:"Pancoats syndrome",k:"រោគសញ្ញា Pancoat"},{v:"D",e:"Headaches, mental status changes",k:"ឈឺក្បាល, ប្រែប្រួលសតិ"},{v:"E",e:"Pleural effusion",k:"ការដក់ទឹកក្នុងស្រោមសួត"}], ans: ["B","D"], pg: 252 },
+    { id: 19, eng: "19.What are the early signs and symptoms of lung cancer? (Choose the correct answers)", khm: "១៩. តើរោគសញ្ញាដំណាក់កាលដំបូងនៃមហារីកសួតមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Dyspnea",k:"ការពិបាកដកដង្ហើម"},{v:"B",e:"Chest pain/tightness",k:"ការឈឺទ្រូង"},{v:"C",e:"Head and neck edema",k:"ការហើមនៅក្បាល និងក"},{v:"D",e:"Blurred vision, headaches",k:"ស្រវាំងភ្នែក"},{v:"E",e:"Recurring respiratory infections",k:"ការបង្ករោគផ្លូវដង្ហើមញឹកញាប់"}], ans: ["A","E"], pg: 253 },
+    { id: 20, eng: "20.What are the late signs and symptoms of lung cancer? (Choose the correct answers)", khm: "២០. តើរោគសញ្ញាដំណាក់ចុងក្រោយនៃមហារីកសួតមានអ្វីខ្លះ?", opts: [{v:"A",e:"Dysphagia",k:"ការពិបាកលេបអាហារ"},{v:"B",e:"Hemoptysis",k:"ការក្អកមានឈាម"},{v:"C",e:"Recurring respiratory infections",k:"ការបង្ករោគផ្លូវដង្ហើម"},{v:"D",e:"Bone pain, spinal cord compression",k:"ការឈឺឆ្អឹង"},{v:"E",e:"Pleural effusion",k:"ការដក់ទឹកក្នុងស្រោមសួត"}], ans: ["A","D","E"], pg: 253 },
+    { id: 21, eng: "21.What are the side effects of chemotherapy treatments of lung cancer? (Choose the correct answers)", khm: "២១. តើផលប៉ះពាល់នៃការព្យាបាលមហារីកសួតដោយប្រើគីមីមានអ្វីខ្លះ?", opts: [{v:"A",e:"Pain",k:"ការឈឺចាប់"},{v:"B",e:"Alopecia, SOB",k:"ការជ្រុះសក់ និងហត់"},{v:"C",e:"Tingling",k:"អារម្មណ៍ស្ពឹកស្រពន់"},{v:"D",e:"Irritable",k:"ការមួរម៉ៅ"},{v:"E",e:"Decreased hematopoietic function",k:"ថយចុះមុខងារបង្កើតគ្រាប់ឈាម"}], ans: ["B","C","D"], pg: 267 },
+    { id: 22, eng: "22.Which ones are the criteria of inoperability of Esophegeal Cancer? (Choose the correct answers)", khm: "២២. តើលក្ខខណ្ឌអ្វីខ្លះដែលមិនអាចធ្វើការវះកាត់មហារីកបំពង់អាហារបាន?", opts: [{v:"A",e:"Unfit patient",k:"អ្នកជំងឺមិនមានកម្លាំង"},{v:"B",e:"Presence of distant metastases",k:"មានការរាលដាលសរីរាង្គឆ្ងាយ"},{v:"C",e:"Unrespectable tumor",k:"ដុំសាច់មិនអាចវះកាត់ចេញ"},{v:"D",e:"Respectable tumor",k:"ដុំសាច់ត្រៀមវះកាត់"},{v:"E",e:"Infiltration of important structure as trachea, aorta",k:"រាលដាលចូលសរីរាង្គសំខាន់"}], ans: ["A","B","C","E"], pg: 316 },
+    { id: 23, eng: "23.Inguinal swelling appears quickly when the infant: (Choose the correct answers)", khm: "២៣. ការហើមនៅតំបន់ក្រលៀនលេចឡើងយ៉ាងឆាប់រហ័សនៅពេលទារក៖", opts: [{v:"A",e:"Take a rest",k:"សម្រាក"},{v:"B",e:"Cry",k:"យំ"},{v:"C",e:"Strain",k:"ខំប្រឹង (ជុះ ឬនោម)"},{v:"D",e:"Cough",k:"ក្អក"},{v:"E",e:"Walk for a long period",k:"ដើរក្នុងរយៈពេលយូរ"}], ans: ["B","C","D"], pg: 196 },
+    { id: 24, eng: "24.What are the signs and symptoms of Generalized of the lung cancer? (Choose the correct answers)", khm: "២៤. តើរោគសញ្ញាទូទៅនៃមហារីកសួតមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Bone pain",k:"ការឈឺឆ្អឹង"},{v:"B",e:"Headaches, mental status changes",k:"ឈឺក្បាល, ប្រែប្រួលសតិ"},{v:"C",e:"Weight loss",k:"ការស្រកទម្ងន់"},{v:"D",e:"Generalized – involves other areas spread",k:"រោគសញ្ញាទូទៅ – រាលដាលដល់ផ្នែកផ្សេងៗ"},{v:"E",e:"Change in phlegm",k:"ការផ្លាស់ប្តូរពណ៌ស្លេស្ម"}], ans: ["A","B","C","D"], pg: 250 },
+    { id: 25, eng: "25.What are the early signs and symptoms of Lung Cancer? (Choose the correct answers)", khm: "២៥. តើរោគសញ្ញាដំណាក់កាលដំបូងនៃមហារីកសួតមានអ្វីខ្លះ? (ជ្រើសរើសចម្លើយដែលត្រឹមត្រូវ)", opts: [{v:"A",e:"Head and neck edema",k:"ការហើមនៅក្បាល និងក"},{v:"B",e:"Chest/shoulder pain",k:"ការឈឺទ្រូង ឬស្មា"},{v:"C",e:"Hemoptysis",k:"ការក្អកមានឈាម"},{v:"D",e:"Dysphagia",k:"ការពិបាកលេប"},{v:"E",e:"Dyspnea",k:"ការពិបាកដកដង្ហើម"}], ans: ["B","C","E"], pg: 253 },
+    { id: 26, eng: "26. What is the peak incidence Abdominal Trauma?", khm: "២៦. តើអត្រាកើតមានរបួសពោះខ្ពស់បំផុតក្នុងចន្លោះអាយុប៉ុន្មាន?", opts: [{v:"A",e:"10 – 30 years",k:"១០ – ៣០ ឆ្នាំ"},{v:"B",e:"15 – 30 years",k:"១៥ – ៣០ ឆ្នាំ"},{v:"C",e:"20 – 30 years",k:"២០ – ៣០ ឆ្នាំ"},{v:"D",e:"25 – 30 years",k:"២៥ – ៣០ ឆ្នាំ"}], ans: ["B"], pg: 84 },
+    { id: 27, eng: "27. What is the first management of Abdominal Trauma?", khm: "២៧. តើការគ្រប់គ្រងដំបូងបង្អស់នៃរបួសពោះគឺជាអ្វី?", opts: [{v:"A",e:"Principle of ABC",k:"គោលការណ៍ ABC"},{v:"B",e:"Initial assessment and resuscitation. Establish injury.",k:"ការវាយតម្លៃដំបូង និងការសង្គ្រោះបន្ទាន់។"},{v:"C",e:"Initial examination and resuscitation simultaneous.",k:"ការពិនិត្យដំបូង និងការសង្គ្រោះក្នុងពេលដំណាលគ្នា។"},{v:"D",e:"Initial fluid resuscitation; rapid infusion of 2L",k:"ការបញ្ចូលជាតិទឹកដំបូង ២ លីត្រយ៉ាងលឿន។"}], ans: ["B"], pg: 92 },
+    { id: 28, eng: "28. Which organ is most vulnerable abdominal organ to blunt injury?", khm: "២៨. តើសរីរាង្គពោះមួយណាដែលងាយរងគ្រោះបំផុតដោយសារការទង្គិច?", opts: [{v:"A",e:"Lung",k:"សួត"},{v:"B",e:"Spleen",k:"អណ្តើក"},{v:"C",e:"Liver",k:"ថ្លើម"},{v:"D",e:"Bowel",k:"ពោះវៀន"}], ans: ["C"], pg: 117 },
+    { id: 29, eng: "29. Which organ is the commonest injured organ in blunt abdominal trauma?", khm: "២៩. តើសរីរាង្គមួយណាដែលរងរបួសញឹកញាប់ជាងគេក្នុងករណីទង្គិច?", opts: [{v:"A",e:"Lung",k:"សួត"},{v:"B",e:"Spleen",k:"អណ្តើក"},{v:"C",e:"Liver",k:"ថ្លើម"},{v:"D",e:"Bowel",k:"ពោះវៀាន"}], ans: ["B"], pg: 118 },
+    { id: 30, eng: "30. Which organ is the small intestines takes up a large part and likely to be damaged in penetrating injury?", khm: "៣០. តើសរីរាង្គមួយណាដែលជាផ្នែកដ៏ធំនៃពោះ ហើយងាយនឹងរងការខូចខាត?", opts: [{v:"A",e:"Lung",k:"សួត"},{v:"B",e:"Spleen",k:"អណ្តើក"},{v:"C",e:"Liver",k:"ថ្លើម"},{v:"D",e:"Bowel",k:"ពោះវៀន"}], ans: ["D"], pg: 122 },
+    { id: 31, eng: "31. What are the physical examination of clinical finding in spontaneous pneumothorax? (Choose correct answers)", khm: "៣១. តើការពិនិត្យរាងកាយរកឃើញរោគសញ្ញាអ្វីខ្លះក្នុងជំងឺធ្លាយខ្យល់ក្នុងស្រោមសួតដោយឯកឯង?", opts: [{v:"A",e:"Tympanic percussion note",k:"ការគោះលាន់សម្លេងដូចស្គរ"},{v:"B",e:"Absent breath sounds",k:"ការបាត់សម្លេងដកដង្ហើម"},{v:"C",e:"Trachea deviated to the side of the collapse",k:"បំពង់ខ្យល់ងាកទៅរកចំហៀងដែលសួតស្រពោន"},{v:"D",e:"Duskiness percussion note",k:"ការគោះសម្លេងស្រអាប់"}], ans: ["A","B","C"], pg: 151 },
+    { id: 32, eng: "32. Low-velocity penetrating injury include: (Choose the correct answers)", khm: "៣២. របួសដោយការចាក់ទម្លុះដែលមានល្បឿនទាបរួមមាន៖", opts: [{v:"A",e:"burst injuries",k:"របួសដោយការផ្ទុះ"},{v:"B",e:"parenchymal disruption.",k:"ការដាច់រហែកជាលិកា"},{v:"C",e:"Stab wounds",k:"របួសដោយសារការចាក់"},{v:"D",e:"Percutaneous biopsy",k:"ការចោះយកសាច់ពិនិត្យ"},{v:"E",e:"Cholangiography",k:"ការថតឆ្លុះបំពង់ទឹកប្រមាត់"}], ans: ["C","D","E"], pg: 42 },
+    { id: 33, eng: "33. Cyanosis is a sign/symptom of: (Choose the correct answers)", khm: "៣៣. ការស្វាយបបូរមាត់ ឬចុងដៃចុងជើង (Cyanosis) គឺជាកត្តាសញ្ញានៃ៖", opts: [{v:"A",e:"Sucking chest wounds",k:"របួសទ្រូងដែលបឺតខ្យល់"},{v:"B",e:"Flail chest",k:"របួសទ្រូងយោល"},{v:"C",e:"Rib fracture",k:"ការបាក់ឆ្អឹងជំនី"},{v:"D",e:"Tension pneumothorax",k:"ការធ្លាយខ្យល់ដោយសម្ពា"},{v:"E",e:"Hemothorax",k:"ការដក់ឈាមក្នុងស្រោមសួត"}], ans: ["D","E"], pg: 14 },
+    { id: 34, eng: "34. Blood accumulation in chest cavity is considered as:", khm: "៣៤. ការកកកុញឈាមក្នុងស្រោងទ្រូងត្រូវបានចាត់ទុកថាជា៖", opts: [{v:"A",e:"Sucking chest wounds",k:"របួសទ្រូងបឺតខ្យល់"},{v:"B",e:"Hemothorax",k:"ការដក់ឈាមក្នុងស្រោមសួត"},{v:"C",e:"Flail chest",k:"របួសទ្រូងយោល"},{v:"D",e:"Tension pneumothorax",k:"ការធ្លាយខ្យល់ដោយសម្ពាធ"}], ans: ["B"], pg: 26 },
+    { id: 35, eng: "35. What are the signs and symptoms of tension pneumothorax? (Set 1)", khm: "៣៥. តើរោគសញ្ញានៃការធ្លាយខ្យល់ក្នុងស្រោមសួតដោយសម្ពាធមានអ្វីខ្លះ?", opts: [{v:"A",e:"Difficulty breathing",k:"ការពិបាកដកដង្ហើម"},{v:"B",e:"Chest pain",k:"ការឈឺទ្រូង"},{v:"C",e:"Unilateral decreased",k:"សម្លេងដកដង្ហើមថយចុះម្ខាង"},{v:"D",e:"Normal breathing",k:"ការដកដង្ហើមធម្មតា"},{v:"E",e:"Bilateral decreased",k:"ថយចុះទាំងសងខាង"}], ans: ["A","B","C"], pg: 14 },
+    { id: 36, eng: "36. What are the signs and symptoms of tension pneumothorax? (Set 2)", khm: "៣៦. តើរោគសញ្ញានៃការធ្លាយខ្យល់ក្នុងស្រោមសួតដោយសម្ពាធមានអ្វីខ្លះ? (ឈុត ២)", opts: [{v:"A",e:"Increased pulse",k:"ជីពចរដើរលឿន"},{v:"B",e:"Decreased pulse",k:"ជីពចរដើរយឺត"},{v:"C",e:"Jugular venous distention",k:"ការប៉ោងសរសៃវ៉ែននៅក"},{v:"D",e:"Tracheal deviation",k:"ការងាកនៃបំពង់ខ្យល់"},{v:"E",e:"Without tracheal deviation",k:"ដោយមិនមានការងាក"}], ans: ["A","C","D"], pg: 14 },
+    { id: 37, eng: "37. Treatments of Hemothorax: (Choose the correct answers)", khm: "៣៧. តើការព្យាបាលការដក់ឈាមក្នុងស្រោមសួតមានអ្វីខ្លះ?", opts: [{v:"A",e:"Cover and dress open chest wounds",k:"គ្របនិងរុំរបួសទ្រូង"},{v:"B",e:"Massive treated with IV fluids for shock",k:"ព្យាបាលដោយបញ្ចូលសេរ៉ូម"},{v:"C",e:"Immediate evacuation to surgical assets.",k:"បញ្ជូនទៅកាន់ផ្នែកវះកាត់ជាបន្ទាន់"},{v:"D",e:"Not neccessary for evacuation",k:"មិនចាំបាច់បញ្ជូន"},{v:"E",e:"Medical treatment",k:"ការព្យាបាលដោយប្រើថ្នាំ"}], ans: ["A","B","C"], pg: 28 },
+    { id: 38, eng: "38. What are the signs and symptoms of flail chest? (Choose the correct answers)", khm: "៣៨. តើរោគសញ្ញានៃរបួសទ្រូងយោលមានអ្វីខ្លះ?", opts: [{v:"A",e:"Minimal pain at site",k:"ការឈឺចាប់តិចតួច"},{v:"B",e:"Normal breathing",k:"ការដកដង្ហើមធម្មតា"},{v:"C",e:"Severe pain at site",k:"ការឈឺចាប់ខ្លាំង"},{v:"D",e:"Rapid shallow breathing",k:"ការដកដង្ហើមញាប់ និងរាក់"},{v:"E",e:"Paradoxical respirations",k:"ការដកដង្ហើមបញ្ច្រាសគ្នា"}], ans: ["C","D","E"], pg: 29 },
+    { id: 39, eng: "39. What are the signs and symptoms of esophageal cancer? (Choose correct answers)", khm: "៣៩. តើរោគសញ្ញានៃមហារីកបំពង់អាហារមានអ្វីខ្លះ?", opts: [{v:"A",e:"Dysphagia",k:"ការពិបាកលេបអាហារ"},{v:"B",e:"Weight loss without trying",k:"ការស្រកទម្ងន់"},{v:"C",e:"Worsening indigestion liver cancer signs",k:"ការមិនរំលាយអាហារ"},{v:"D",e:"Without dysphagia",k:"ដោយមិនមានការពិបាក"},{v:"E",e:"Gain weight",k:"ការឡើងទម្ងន់"}], ans: ["A","B"], pg: 300 },
+    { id: 40, eng: "40. What should you assess before transferring a patient to OR? (Choose the correct answers)", khm: "៤០. តើអ្នកគួរវាយតម្លៃអ្វីខ្លះ មុនពេលបញ្ជូនអ្នកជំងឺទៅបន្ទប់វះកាត់?", opts: [{v:"A",e:"Penetrating injury",k:"របួសដោយការចាក់ទម្លុះ"},{v:"B",e:"Patient is unstable",k:"អ្នកជំងឺមានស្ថានភាពមិននឹងនរ"},{v:"C",e:"Patient is stable",k:"អ្នកជំងឺមានស្ថានភាពនឹងនរ"},{v:"D",e:"Bleeding with hilar injury",k:"ការហូរឈាមពាក់ព័ន្ធរបួសទងសួត"}], ans: ["A","B","D"], pg: 291 }
+];
+
+function toggleKhmer() {
+    document.querySelectorAll('.khm-q, .khm-opt-text').forEach(el => el.classList.toggle('hidden-khmer'));
+}
+
+function handleAutoCheck(qId) {
+    const item = quizData.find(x => x.id === qId);
+    const card = document.getElementById(`card-${qId}`);
+    const inputs = card.querySelectorAll('input:checked');
+    const feedback = card.querySelector('.feedback-box');
+    const redoBtn = card.querySelector('.btn-redo');
+    
+    // Logic: Trigger when selection count matches answer count
+    if (inputs.length === item.ans.length) {
+        card.classList.add('locked'); // Lock interactions
+        const selectedValues = Array.from(inputs).map(i => i.value);
+        const isPerfect = selectedValues.every(val => item.ans.includes(val));
+
+        // Mark Correct and Mistakes
+        card.querySelectorAll('.option-label').forEach(label => {
+            const input = label.querySelector('input');
+            const val = input.value;
+
+            if (input.checked) {
+                if (item.ans.includes(val)) {
+                    label.classList.add('user-correct');
+                } else {
+                    label.classList.add('user-wrong');
+                }
+            } else {
+                // Show user what they missed
+                if (item.ans.includes(val)) {
+                    label.classList.add('actual-answer');
+                }
+            }
+        });
+
+        feedback.style.display = 'block';
+        redoBtn.style.display = 'block'; // Show the redo button
+
+        if (isPerfect) {
+            feedback.style.color = "var(--correct)";
+            feedback.innerHTML = `✨ Correct! All chosen answers are true.`;
+        } else {
+            feedback.style.color = "var(--wrong)";
+            feedback.innerHTML = `❌ Incorrect. See highlights above. <span class="reveal-ans">True Answers: ${item.ans.join(", ")}</span>`;
+        }
+    }
+}
+
+function redoQuestion(qId) {
+    const card = document.getElementById(`card-${qId}`);
+    const feedback = card.querySelector('.feedback-box');
+    const redoBtn = card.querySelector('.btn-redo');
+    
+    // Reset inputs
+    card.querySelectorAll('input').forEach(i => i.checked = false);
+    
+    // Reset styles
+    card.querySelectorAll('.option-label').forEach(label => {
+        label.classList.remove('user-correct', 'user-wrong', 'actual-answer');
+    });
+
+    // Reset UI
+    feedback.style.display = 'none';
+    redoBtn.style.display = 'none';
+    card.classList.remove('locked');
+}
+
+function initQuiz() {
+    const root = document.getElementById('quiz-anchor');
+    quizData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.id = `card-${item.id}`;
+        
+        let optsHtml = '';
+        item.opts.forEach(o => {
+            optsHtml += `
+                <label class="option-label">
+                    <input type="checkbox" value="${o.v}" onchange="handleAutoCheck(${item.id})">
+                    <div>
+                        <strong>${o.v}.</strong> ${o.e}
+                        <span class="khm-opt-text" style="display:block; font-size:0.9em; color:#64748b; margin-top:4px;">${o.k}</span>
+                    </div>
+                </label>
+            `;
+        });
+
+        card.innerHTML = `
+            <span class="eng-q">${item.eng}</span>
+            <span class="khm-q">${item.khm}</span>
+            <div class="options-container">${optsHtml}</div>
+            <div class="feedback-box"></div>
+            <div class="footer">
+                <div class="action-btns">
+                    <span class="count-tag">Pick ${item.ans.length}</span>
+                    <button class="btn-redo" onclick="redoQuestion(${item.id})">Try Again (Redo)</button>
+                </div>
+                <a href="1-Chest%20Trauma_merged.pdf#page=${item.pg}" target="_blank" class="pdf-link">
+                    📄 Ref: Page ${item.pg}
+                </a>
+            </div>
+        `;
+        root.appendChild(card);
+    });
+}
+
+window.onload = initQuiz;
+</script>
+
+</body>
+</html>
